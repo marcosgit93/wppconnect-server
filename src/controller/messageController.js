@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import { unlinkAsync } from '../util/functions';
-
+import fs from 'fs';
 function returnError(req, res, error) {
   req.logger.error(error);
   res.status(500).json({ status: 'Error', message: 'Erro ao enviar a mensagem.' });
@@ -22,6 +22,17 @@ function returnError(req, res, error) {
 
 async function returnSucess(res, data) {
   res.status(201).json({ status: 'success', response: data, mapper: 'return' });
+}
+
+//Function screenshot
+async function screenshot_base64(req, contato) {
+  var number_clear = contato.replace('@c.us', '');
+  var number_filter = number_clear.slice(-8, -4) + '-' + number_clear.slice(-4);
+  const elements = await req.client.page.$x(`//*[contains(text(),'${number_filter}')]`);
+  await elements[0].click();
+  await req.client.page.screenshot({ path: `/tmp/screen-${number_filter}.png` });
+  const imageAsBase64 = fs.promises.readFile(`/tmp/screen-${number_filter}.png`, 'base64');
+  return await imageAsBase64;
 }
 
 export async function sendMessage(req, res) {
@@ -32,9 +43,10 @@ export async function sendMessage(req, res) {
   try {
     let results = [];
     for (const contato of phone) {
-      results.push(await req.client.sendText(contato, message, options));
+      var result = await req.client.sendText(contato, message, options);
+      result.screenshot_base64 = await screenshot_base64(req, contato);
+      results.push(result);
     }
-
     if (results.length === 0) return res.status(400).json('Error sending message');
     req.io.emit('mensagem-enviada', results);
     returnSucess(res, results);
@@ -56,7 +68,9 @@ export async function sendImage(req, res) {
   try {
     let results = [];
     for (const contato of phone) {
-      results.push(await req.client.sendImage(contato, pathFile, filename, caption));
+      var result = await req.client.sendImage(contato, pathFile, filename, caption);
+      result.screenshot_base64 = await screenshot_base64(req, contato);
+      results.push(result);
     }
 
     if (results.length === 0) return res.status(400).json('Error sending message');
@@ -80,7 +94,9 @@ export async function sendFile(req, res) {
   try {
     let results = [];
     for (const contato of phone) {
-      results.push(await req.client.sendFile(contato, pathFile, filename, message));
+      var result = req.client.sendFile(contato, pathFile, filename, message);
+      result.screenshot_base64 = await screenshot_base64(req, contato);
+      results.push(result);
     }
 
     if (results.length === 0) return res.status(400).json('Error sending message');
@@ -182,7 +198,9 @@ export async function sendButtons(req, res) {
     let results = [];
 
     for (const contact of phone) {
-      results.push(await req.client.sendText(contact, message, options));
+      var result = req.client.sendText(contact, message, options);
+      result.screenshot_base64 = await screenshot_base64(req, contact);
+      results.push(result);
     }
 
     if (results.length === 0) return returnError(req, res, 'Error sending message with buttons');
