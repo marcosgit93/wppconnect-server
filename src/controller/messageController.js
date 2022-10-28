@@ -95,6 +95,8 @@ export async function sendFile(req, res) {
     let results = [];
     for (const contato of phone) {
       var result = req.client.sendFile(contato, pathFile, filename, message);
+      const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+      await sleep(3000);
       result.screenshot_base64 = await screenshot_base64(req, contato);
       results.push(result);
     }
