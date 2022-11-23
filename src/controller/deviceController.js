@@ -19,6 +19,20 @@ import { contactToArray, unlinkAsync } from '../util/functions';
 import mime from 'mime-types';
 import { clientsArray } from '../util/sessionUtil';
 
+async function profile_screen_base64(req) {
+  const elements = await req.client.page.$x(`//*[@id="side"]/header/div[1]/div/div`);
+  await elements[0].click();
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  await sleep(2000);
+  await req.client.page.screenshot({ path: `/tmp/pageinfo-${req.session}.png` });
+  const imageAsBase64 = fs.promises.readFile(`/tmp/pageinfo-${req.session}.png`, 'base64');
+  const elements_back = await req.client.page.$x(
+    `//*[@id="app"]/div/div/div[2]/div[1]/span/div/span/div/header/div/div[1]/button/span`
+  );
+  await elements_back[0].click();
+  return await imageAsBase64;
+}
+
 function returnSucess(res, session, phone, data) {
   res.status(201).json({
     status: 'Success',
@@ -417,8 +431,12 @@ export async function setProfilePic(req, res) {
 
     await req.client.setProfilePic(pathFile);
     await unlinkAsync(pathFile);
-
-    return res.status(200).json({ status: 'success', response: { message: 'Profile photo successfully changed' } });
+    let imageAsBase64;
+    imageAsBase64 = await profile_screen_base64(req);
+    return res.status(200).json({
+      status: 'success',
+      response: { message: 'Profile photo successfully changed', imagebase64: await imageAsBase64 },
+    });
   } catch (e) {
     req.logger.error(e);
     return res.status(500).json({ status: 'error', message: 'Error changing profile photo' });
